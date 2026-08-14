@@ -1,0 +1,1 @@
+import requests\nfrom bs4 import BeautifulSoup\n\ndef fetch(url):\n    response = requests.get(url)\n    if response.status_code == 200:\n        return BeautifulSoup(response.content, 'html.parser')\n    else:\n        raise Exception(f'Failed to fetch {url}, status code: {response.status_code}')
