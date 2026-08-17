@@ -1,1 +1,42 @@
-import aiohttp\nimport asyncio\nimport requests\nimport csv\nimport json\nimport sqlite3\nfrom bs4 import BeautifulSoup\nimport time\nimport os\nfrom urllib.parse import urlparse\n\nclass RateLimiter:\n    def __init__(self):\n        self.last_request_time = {}\n        self.min_delay = 1\n\n    def wait(self, url):\n        domain = urlparse(url).netloc\n        current_time = time.time()\n        if domain in self.last_request_time:\n            elapsed_time = current_time - self.last_request_time[domain]\n            if elapsed_time < self.min_delay:\n                time.sleep(self.min_delay - elapsed_time)\n        self.last_request_time[domain] = time.time()\n\nasync def fetch(url, session, selector):\n    rate_limiter.wait(url)\n    async with session.get(url) as response:\n        if response.status == 200:\n            html = await response.text()\n            soup = BeautifulSoup(html, 'html.parser')\n            return [element.get_text() for element in soup.select(selector)]\n        return []\n\nasync def scrape(urls, selector, output_format):\n    async with aiohttp.ClientSession() as session:\n        tasks = [fetch(url, session, selector) for url in urls]\n        results = await asyncio.gather(*tasks)\n\n    if output_format == 'json':\n        with open('output.json', 'w') as f:\n            json.dump(results, f)\n    elif output_format == 'csv':\n        with open('output.csv', 'w', newline='') as f:\n            writer = csv.writer(f)\n            writer.writerows(results)\n\ndef run_scraper(config_file):\n    with open(config_file) as f:\n        config = json.load(f)\n    urls = config['urls']\n    selector = config['selector']\n    output_format = config['output_format']\n    asyncio.run(scrape(urls, selector, output_format))\n\nif __name__ == '__main__':\n    import sys\n    if len(sys.argv) != 2:\n        print('Usage: python scraper.py <config_file>')\n        sys.exit(1)\n    run_scraper(sys.argv[1])
+import aiohttp
+import asyncio
+import requests
+import csv
+import json
+import sqlite3
+from bs4 import BeautifulSoup
+import time
+import os
+from urllib.parse import urlparse
+
+class RateLimiter:
+    def __init__(self):
+        self.last_request_time = {}
+        self.min_delay = 1
+
+    def wait(self, url):
+        domain = urlparse(url).netloc
+        current_time = time.time()
+        if domain in self.last_request_time:
+            elapsed_time = current_time - self.last_request_time[domain]
+            if elapsed_time < self.min_delay:
+                time.sleep(self.min_delay - elapsed_time)
+        self.last_request_time[domain] = time.time()
+
+class Scraper:
+    def __init__(self, rate_limit=1):
+        self.rate_limiter = RateLimiter()
+        self.min_delay = rate_limit
+
+    async def scrape(self, url):
+        self.rate_limiter.wait(url)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    html = await response.text()
+                    return self.parse(html)
+                return None
+
+    def parse(self, html):
+        soup = BeautifulSoup(html, 'html.parser')
+        return [element.text for element in soup.find_all('p')]  # example parsing
